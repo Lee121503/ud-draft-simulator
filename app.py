@@ -118,25 +118,38 @@ if ud_file and etr_file:
         name = re.sub(r"\s+", " ", name).strip()
         return name
     
-    # Normalize names
+    # --- Normalize names ---
     ud_df["player_norm"] = ud_df["player"].apply(normalize_name)
     etr_df["player_norm"] = etr_df["player"].apply(normalize_name)
     
-    # Fuzzy match UD -> ETR (token sort ratio)
+    # --- Fuzzy match UD -> ETR ---
     etr_names = etr_df["player_norm"].tolist()
     ud_df["etr_match_norm"] = ud_df["player_norm"].apply(
         lambda x: process.extractOne(x, etr_names, scorer=fuzz.token_sort_ratio)[0]
     )
     
-    # Merge on normalized fuzzy match
+    # --- Merge on fuzzy match ---
     pool_df = pd.merge(
         ud_df,
-        etr_df[["player_norm", "position", "nflteam", "etrproj"]],  # keep ETR essentials
+        etr_df[["player_norm", "position", "nflteam", "etrproj"]],
         left_on="etr_match_norm",
         right_on="player_norm",
         how="left",
         suffixes=("_ud","_etr")
     )
+    
+    # --- Backfill missing position/team from UD if ETR didn’t list player ---
+    if "position_ud" in pool_df.columns:
+        pool_df["position"] = pool_df["position"].fillna(pool_df["position_ud"])
+    if "nflteam_ud" in pool_df.columns:
+        pool_df["nflteam"] = pool_df["nflteam"].fillna(pool_df["nflteam_ud"])
+    
+    # --- Fill missing projections with 0 ---
+    pool_df["etrproj"] = pool_df["etrproj"].fillna(0)
+    
+    # --- Keep original UD display name for UI ---
+    pool_df["player_display"] = pool_df["player"]
+
     
     # Keep the original UD display name for UI
     pool_df["player_display"] = pool_df["player"]
