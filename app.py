@@ -193,9 +193,10 @@ if ud_file and etr_file:
                 st.session_state.current_index += 1
                 st.session_state.awaiting_pick = False
             else:
-                # ❌ invalid pick — stay on your turn
+                # ❌ invalid pick — do not advance
                 st.warning("Roster restriction prevents adding this player. Please select another.")
-                # Do NOT advance index, do NOT reset awaiting_pick
+                # Keep awaiting_pick = True and current_index unchanged
+
 
 
     # --- Show results so far ---
