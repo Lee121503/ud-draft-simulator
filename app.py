@@ -132,22 +132,24 @@ if ud_file and etr_file:
     # --- Merge: keep UD’s position/team, bring in ETR projection ---
     pool_df = pd.merge(
         ud_df[["player","player_norm","adp","udproj","slotname","nflteam"]],
-        etr_df[["player_norm","pos","team","etrproj"]],
+        etr_df[["player_norm","position","nflteam","etrproj"]],
         left_on="etr_match_norm",
         right_on="player_norm",
         how="left"
-    )
-    
+    )    
     # Standardize column names
     pool_df.rename(columns={
-        "slotname":"position",   # UD position
-        "pos":"position_etr",    # ETR position
-        "team":"nflteam_etr"     # ETR team
+        "slotname":"position_ud",
+        "position":"position_etr",
+        "nflteam":"nflteam_etr"
     }, inplace=True)
     
-    # Backfill position/team from UD if ETR missing
-    pool_df["position"] = pool_df["position"].fillna(pool_df["position_etr"])
+    # Backfill from UD if ETR missing
+    pool_df["position"] = pool_df["position_ud"].fillna(pool_df["position_etr"])
     pool_df["nflteam"] = pool_df["nflteam"].fillna(pool_df["nflteam_etr"])
+    pool_df["etrproj"] = pool_df["etrproj"].fillna(0)
+    
+    pool_df["player_display"] = pool_df["player"]
     
     # Fill missing projections with 0
     pool_df["etrproj"] = pool_df["etrproj"].fillna(0)
