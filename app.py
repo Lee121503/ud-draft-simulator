@@ -27,13 +27,17 @@ def init_team_roster():
 
 def can_add_player(player_row, team_roster):
     pos = str(player_row.get("position","")).lower()
-    if pos in ["qb","rb","wr","te"]:
-        if len(team_roster["positions"][pos]) < ROSTER_TEMPLATE[pos]:
-            return True
-    if pos in ["rb","wr","te"]:
-        if len(team_roster["positions"]["flex"]) < ROSTER_TEMPLATE["flex"]:
-            return True
+
+    # Dedicated slot check
+    if pos in ROSTER_TEMPLATE and len(team_roster["positions"][pos]) < ROSTER_TEMPLATE[pos]:
+        return True
+
+    # Flex slot check (RB/WR/TE eligible)
+    if pos in ["rb","wr","te"] and len(team_roster["positions"]["flex"]) < ROSTER_TEMPLATE["flex"]:
+        return True
+
     return False
+
 
 def assign_player(player_row, team_roster):
     pos = str(player_row.get("position","")).lower()
