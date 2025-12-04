@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import time
+import random
 
 ROSTER_TEMPLATE = {"qb":1,"rb":1,"wr":2,"te":1,"flex":1}
 
@@ -63,33 +64,10 @@ def pick_player(pool_df, team_roster, w_proj=1.0, w_adp=1.0, noise_scale=0.05):
     df["score"] = df["basescore"] + df["stackbonus"] + np.random.normal(0,noise_scale,len(df))
     return df.loc[df["score"].idxmax()]
 
-def simulate_draft(pool_df, num_teams=12, rounds=6, w_proj=1.0, w_adp=1.0):
-    available = pool_df.copy()
-    teams = [init_team_roster() for _ in range(num_teams)]
-    order = snake_order(num_teams, rounds)
-    picks=[]
-    for r,t in order:
-        if available.empty: break
-        choice = pick_player(available, teams[t], w_proj, w_adp)
-        if choice is None: continue
-        assign_player(choice, teams[t])
-        picks.append({
-            "Round":r+1,"Team":t+1,
-            "Player":choice.get("player",None),
-            "Position":choice.get("position",None),
-            "NFLTeam":choice.get("nflteam",None),
-            "ADP":choice.get("adp",None),
-            "ETRProj":choice.get("etrproj",None),
-            "UDProj":choice.get("udproj",None),
-            "VORP":choice.get("vorp",None)
-        })
-        available = available[available["player"]!=choice.get("player",None)]
-    return pd.DataFrame(picks)
-
 # ----------------------------
 # Streamlit UI
 # ----------------------------
-st.title("12-Man Draft Simulator (Half PPR + VORP)")
+st.title("12-Man Draft Simulator (Manual Draft Mode)")
 st.sidebar.header("Upload CSVs")
 
 ud_file = st.sidebar.file_uploader("Upload 12 Man UD CSV", type=["csv"])
@@ -140,19 +118,56 @@ if ud_file and etr_file:
     rounds=st.sidebar.number_input("Rounds",1,20,6)
     w_proj=st.sidebar.slider("Projection weight",0.0,2.0,1.0,0.1)
     w_adp=st.sidebar.slider("ADP weight",0.0,2.0,1.0,0.1)
-    sims=st.sidebar.number_input("Number of simulations",1,50,1)
 
-    if st.sidebar.button("Run Simulation"):
-        all_picks=[]
-        for i in range(sims):
-            picks_df=simulate_draft(pool_df,num_teams,rounds,w_proj,w_adp)
-            picks_df["Sim"]=i+1
-            all_picks.append(picks_df)
-        result_df=pd.concat(all_picks,ignore_index=True)
+    # Randomly assign your team slot
+    my_team = random.randint(0, num_teams-1)
+    st.sidebar.write(f"You are Team {my_team+1}")
 
+    if st.sidebar.button("Start Draft"):
+        available = pool_df.copy()
+        teams = [init_team_roster() for _ in range(num_teams)]
+        order = snake_order(num_teams, rounds)
+        picks=[]
+        for r,t in order:
+            if available.empty: break
+            if t == my_team:
+                st.subheader(f"Round {r+1}, Your Pick (Team {t+1})")
+                options = available["player"].tolist()
+                choice_name = st.selectbox("Select your player:", options, key=f"pick_{r}_{t}")
+                if st.button("Confirm Pick", key=f"confirm_{r}_{t}"):
+                    choice = available[available["player"]==choice_name].iloc[0]
+                    assign_player(choice, teams[t])
+                    picks.append({
+                        "Round":r+1,"Team":t+1,
+                        "Player":choice.get("player",None),
+                        "Position":choice.get("position",None),
+                        "NFLTeam":choice.get("nflteam",None),
+                        "ADP":choice.get("adp",None),
+                        "ETRProj":choice.get("etrproj",None),
+                        "UDProj":choice.get("udproj",None),
+                        "VORP":choice.get("vorp",None)
+                    })
+                    available = available[available["player"]!=choice_name]
+            else:
+                choice = pick_player(available, teams[t], w_proj, w_adp)
+                if choice is None: continue
+                assign_player(choice, teams[t])
+                picks.append({
+                    "Round":r+1,"Team":t+1,
+                    "Player":choice.get("player",None),
+                    "Position":choice.get("position",None),
+                    "NFLTeam":choice.get("nflteam",None),
+                    "ADP":choice.get("adp",None),
+                    "ETRProj":choice.get("etrproj",None),
+                    "UDProj":choice.get("udproj",None),
+                    "VORP":choice.get("vorp",None)
+                })
+                available = available[available["player"]!=choice.get("player",None)]
+
+        result_df = pd.DataFrame(picks)
         st.subheader("Draft Results")
         st.dataframe(result_df)
-        
+
         st.download_button(
             "Download Draft CSV",
             result_df.to_csv(index=False).encode("utf-8"),
