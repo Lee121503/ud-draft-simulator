@@ -254,46 +254,45 @@ if ud_file and etr_file:
         st.session_state.awaiting_pick = False
         st.success("Draft has been reset. Start again!")
 
-
-    # --- Manual Pick UI ---
-    if st.session_state.awaiting_pick:
-        r, t = st.session_state.order[st.session_state.current_index]
-        st.subheader(f"Round {r+1}, Your Pick (Team {t+1})")
-        options = st.session_state.available["player"].tolist()
-        choice_name = st.selectbox("Select your player:", options, key=f"pick_{r}_{t}")
-
-        if st.button("Confirm Pick", key=f"confirm_{r}_{t}"):
-            choice = st.session_state.available[
-                st.session_state.available["player"] == choice_name
-            ].iloc[0]
-
-            if can_add_player(choice, st.session_state.teams[t]):
-                # ✅ valid pick
-                assign_player(choice, st.session_state.teams[t])
-                st.session_state.picks.append({
-                    "Round": r+1, "Team": t+1,
-                    "Player": choice.get("player", None),
-                    "Position": choice.get("position", None),
-                    "NFLTeam": choice.get("nflteam", None),
-                    "ADP": choice.get("adp", None),
-                    "ETRProj": choice.get("etrproj", None),
-                    "UDProj": choice.get("udproj", None),
-                    "VORP": choice.get("vorp", None)
-                })
-                st.session_state.available = st.session_state.available[
-                    st.session_state.available["player"] != choice_name
-                ]
-                st.session_state.current_index += 1
-                st.session_state.awaiting_pick = False
-            else:
-                # ❌ invalid pick — stay on your turn
-                st.warning("Roster restriction prevents adding this player. Please select another.")
-
     # --- Show results so far ---
     result_df = pd.DataFrame(st.session_state.picks)
     if not result_df.empty:
         st.subheader("Draft Results")
         st.dataframe(result_df)
+
+        # --- Manual Pick UI ---
+        if st.session_state.awaiting_pick:
+            r, t = st.session_state.order[st.session_state.current_index]
+            st.subheader(f"Round {r+1}, Your Pick (Team {t+1})")
+            options = st.session_state.available["player"].tolist()
+            choice_name = st.selectbox("Select your player:", options, key=f"pick_{r}_{t}")
+    
+            if st.button("Confirm Pick", key=f"confirm_{r}_{t}"):
+                choice = st.session_state.available[
+                    st.session_state.available["player"] == choice_name
+                ].iloc[0]
+    
+                if can_add_player(choice, st.session_state.teams[t]):
+                    # ✅ valid pick
+                    assign_player(choice, st.session_state.teams[t])
+                    st.session_state.picks.append({
+                        "Round": r+1, "Team": t+1,
+                        "Player": choice.get("player", None),
+                        "Position": choice.get("position", None),
+                        "NFLTeam": choice.get("nflteam", None),
+                        "ADP": choice.get("adp", None),
+                        "ETRProj": choice.get("etrproj", None),
+                        "UDProj": choice.get("udproj", None),
+                        "VORP": choice.get("vorp", None)
+                    })
+                    st.session_state.available = st.session_state.available[
+                        st.session_state.available["player"] != choice_name
+                    ]
+                    st.session_state.current_index += 1
+                    st.session_state.awaiting_pick = False
+                else:
+                    # ❌ invalid pick — stay on your turn
+                    st.warning("Roster restriction prevents adding this player. Please select another.")
 
         # Draft board view (Rounds × Teams grid)
         board = result_df.pivot(index="Round", columns="Team", values="Player")
