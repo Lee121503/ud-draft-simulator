@@ -329,8 +329,12 @@ if ud_file and etr_file:
         if not st.session_state.available.empty:
             st.subheader("Best Players Remaining")
     
-            # Filter out players marked OUT in UD lineupstatus
             avail = st.session_state.available.copy()
+    
+            # Drop players with no ADP value in UD
+            avail = avail[avail["adp"].notna()]
+    
+            # Optional: also drop OUT players if you want
             if "lineupstatus" in avail.columns:
                 avail = avail[~avail["lineupstatus"].str.upper().eq("OUT")]
     
@@ -343,6 +347,7 @@ if ud_file and etr_file:
                 best_remaining[["player","position","nflteam","adp","etrproj","udproj","vorp"]],
                 use_container_width=True
             )
+
 
         # Download button
         st.download_button(
