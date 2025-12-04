@@ -102,22 +102,22 @@ etr_df.columns = etr_df.columns.str.strip().str.lower()
 ud_df["player"] = ud_df["firstname"] + " " + ud_df["lastname"]
 ud_df.rename(columns={"adp":"adp","projectedpoints":"udproj","teamname":"nflteam"}, inplace=True)
 
-    # Clean ETR — use Half PPR Proj
-    etr_df.rename(columns={"pos":"position","team":"nflteam","half ppr proj":"etrproj"}, inplace=True)
+# Clean ETR — use Half PPR Proj
+etr_df.rename(columns={"pos":"position","team":"nflteam","half ppr proj":"etrproj"}, inplace=True)
 
-    # --- Name normalization helper ---
-    def normalize_name(name: str) -> str:
-        if not isinstance(name, str):
-            return ""
-        name = name.lower().strip()
-        name = re.sub(r"[^\w\s]", "", name)  # remove punctuation
-        name = re.sub(r"\b(jr|sr|ii|iii|iv|v)\b", "", name)  # remove suffixes
-        # common nickname harmonization
-        name = name.replace("ken ", "kenneth ")
-        name = name.replace("dj ", "deejay ")
-        name = name.replace("aj ", "anthony ")
-        name = re.sub(r"\s+", " ", name).strip()
-        return name
+# --- Name normalization helper ---
+def normalize_name(name: str) -> str:
+    if not isinstance(name, str):
+        return ""
+    name = name.lower().strip()
+    name = re.sub(r"[^\w\s]", "", name)  # remove punctuation
+    name = re.sub(r"\b(jr|sr|ii|iii|iv|v)\b", "", name)  # remove suffixes
+    # common nickname harmonization
+    name = name.replace("ken ", "kenneth ")
+    name = name.replace("dj ", "deejay ")
+    name = name.replace("aj ", "anthony ")
+    name = re.sub(r"\s+", " ", name).strip()
+    return name
     
     # --- Normalize names ---
     ud_df["player"] = ud_df["firstname"] + " " + ud_df["lastname"]
