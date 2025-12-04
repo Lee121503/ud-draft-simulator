@@ -43,11 +43,21 @@ def assign_player(player_row, team_roster):
     pos = str(player_row.get("position","")).lower()
     player = player_row.get("player","")
     team = player_row.get("nflteam","")
-    if pos in ["qb","rb","wr","te"] and len(team_roster["positions"][pos]) < ROSTER_TEMPLATE[pos]:
+
+    # Try dedicated slot first
+    if pos in ROSTER_TEMPLATE and len(team_roster["positions"][pos]) < ROSTER_TEMPLATE[pos]:
         team_roster["positions"][pos].append(player)
-    else:
+    # If RB/WR/TE, try flex slot
+    elif pos in ["rb","wr","te"] and len(team_roster["positions"]["flex"]) < ROSTER_TEMPLATE["flex"]:
         team_roster["positions"]["flex"].append(player)
-    team_roster["team_counts"][(pos, team)] = team_roster["team_counts"].get((pos, team),0)+1
+    else:
+        # No valid slot available
+        return False
+
+    # Update team counts
+    team_roster["team_counts"][(pos, team)] = team_roster["team_counts"].get((pos, team), 0) + 1
+    return True
+
 
 def compute_stack_bonus(player_row, team_roster):
     pos = str(player_row.get("position","")).lower()
