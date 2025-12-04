@@ -110,7 +110,7 @@ def simulate_draft(pool_df, num_teams=12, rounds=6, w_proj=1.0, w_adp=1.0):
 # ----------------------------
 # Streamlit UI
 # ----------------------------
-st.title("12-Man Draft Simulator with Roster Constraints")
+st.title("12-Man Draft Simulator (Half PPR)")
 st.sidebar.header("Upload CSVs")
 
 ud_file = st.sidebar.file_uploader("Upload 12 Man UD CSV", type=["csv"])
@@ -124,8 +124,8 @@ if ud_file and etr_file:
     ud_df["Player"] = ud_df["firstName"] + " " + ud_df["lastName"]
     ud_df.rename(columns={"adp":"ADP","projectedPoints":"UDProj","teamName":"NFLTeam"}, inplace=True)
 
-    # Clean ETR
-    etr_df.rename(columns={"Pos":"Position","Team":"NFLTeam","Full PPR Proj":"ETRProj"}, inplace=True)
+    # Clean ETR — now using Half PPR Proj
+    etr_df.rename(columns={"Pos":"Position","Team":"NFLTeam","Half PPR Proj":"ETRProj"}, inplace=True)
 
     # Merge
     pool_df = pd.merge(ud_df, etr_df[["Player","Position","NFLTeam","ETRProj"]], on="Player", how="left")
@@ -135,8 +135,7 @@ if ud_file and etr_file:
     inv_adp = pool_df["ADP"].max() - pool_df["ADP"]
     pool_df["ADPNorm"] = normalize_series(inv_adp)
 
-    st.subheader("Merged Player Pool")
-    # Show only available columns to avoid KeyError
+    st.subheader("Merged Player Pool (Half PPR)")
     expected_cols = ["Player","Position","NFLTeam","ADP","ETRProj","UDProj"]
     available_cols = [c for c in expected_cols if c in pool_df.columns]
     st.dataframe(pool_df[available_cols].head(20))
