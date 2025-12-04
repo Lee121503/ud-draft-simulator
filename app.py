@@ -168,13 +168,14 @@ if ud_file and etr_file:
         st.subheader(f"Round {r+1}, Your Pick (Team {t+1})")
         options = st.session_state.available["player"].tolist()
         choice_name = st.selectbox("Select your player:", options, key=f"pick_{r}_{t}")
+    
         if st.button("Confirm Pick", key=f"confirm_{r}_{t}"):
             choice = st.session_state.available[
                 st.session_state.available["player"] == choice_name
             ].iloc[0]
     
-            # ✅ enforce roster restrictions
             if can_add_player(choice, st.session_state.teams[t]):
+                # ✅ valid pick
                 assign_player(choice, st.session_state.teams[t])
                 st.session_state.picks.append({
                     "Round": r+1, "Team": t+1,
@@ -192,7 +193,9 @@ if ud_file and etr_file:
                 st.session_state.current_index += 1
                 st.session_state.awaiting_pick = False
             else:
+                # ❌ invalid pick — stay on your turn
                 st.warning("Roster restriction prevents adding this player. Please select another.")
+                # Do NOT advance index, do NOT reset awaiting_pick
 
 
     # --- Show results so far ---
