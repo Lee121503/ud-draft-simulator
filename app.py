@@ -7,11 +7,11 @@ import time
 # Roster template
 # ----------------------------
 ROSTER_TEMPLATE = {
-    "QB": 1,
-    "RB": 1,
-    "WR": 2,
-    "TE": 1,
-    "FLEX": 1  # RB/WR/TE
+    "qb": 1,
+    "rb": 1,
+    "wr": 2,
+    "te": 1,
+    "flex": 1  # rb/wr/te
 }
 
 # ----------------------------
@@ -35,40 +35,40 @@ def snake_order(num_teams, rounds):
 
 def init_team_roster():
     return {
-        "positions": {"QB": [], "RB": [], "WR": [], "TE": [], "FLEX": []},
+        "positions": {"qb": [], "rb": [], "wr": [], "te": [], "flex": []},
         "team_counts": {}
     }
 
 def can_add_player(player_row, team_roster):
-    pos = player_row["Position"]
-    # direct slots
-    if pos in ["QB","RB","WR","TE"]:
+    pos = str(player_row.get("position", "")).lower()
+    if pos in ["qb","rb","wr","te"]:
         if len(team_roster["positions"][pos]) < ROSTER_TEMPLATE[pos]:
             return True
-    # flex slot
-    if pos in ["RB","WR","TE"]:
-        if len(team_roster["positions"]["FLEX"]) < ROSTER_TEMPLATE["FLEX"]:
+    if pos in ["rb","wr","te"]:
+        if len(team_roster["positions"]["flex"]) < ROSTER_TEMPLATE["flex"]:
             return True
     return False
 
 def assign_player(player_row, team_roster):
-    pos = player_row["Position"]
-    if pos in ["QB","RB","WR","TE"] and len(team_roster["positions"][pos]) < ROSTER_TEMPLATE[pos]:
-        team_roster["positions"][pos].append(player_row["Player"])
+    pos = str(player_row.get("position", "")).lower()
+    player = player_row.get("player", "")
+    team = player_row.get("nflteam", "")
+    if pos in ["qb","rb","wr","te"] and len(team_roster["positions"][pos]) < ROSTER_TEMPLATE[pos]:
+        team_roster["positions"][pos].append(player)
     else:
-        team_roster["positions"]["FLEX"].append(player_row["Player"])
-    team_roster["team_counts"][(pos, player_row["NFLTeam"])] = team_roster["team_counts"].get((pos, player_row["NFLTeam"]), 0) + 1
+        team_roster["positions"]["flex"].append(player)
+    team_roster["team_counts"][(pos, team)] = team_roster["team_counts"].get((pos, team), 0) + 1
 
 def compute_stack_bonus(player_row, team_roster):
-    pos = player_row["Position"]
-    team = player_row["NFLTeam"]
-    if pd.isna(team) or team == "":
+    pos = str(player_row.get("position", "")).lower()
+    team = player_row.get("nflteam", None)
+    if not team or pd.isna(team):
         return 0.0
-    has_qb = team_roster["team_counts"].get(("QB", team), 0) > 0
-    has_wrte = team_roster["team_counts"].get(("WR", team), 0) > 0 or team_roster["team_counts"].get(("TE", team), 0) > 0
-    if pos in ["WR", "TE"] and has_qb:
+    has_qb = team_roster["team_counts"].get(("qb", team), 0) > 0
+    has_wrte = team_roster["team_counts"].get(("wr", team), 0) > 0 or team_roster["team_counts"].get(("te", team), 0) > 0
+    if pos in ["wr", "te"] and has_qb:
         return 0.1
-    if pos == "QB" and has_wrte:
+    if pos == "qb" and has_wrte:
         return 0.1
     return 0.0
 
@@ -76,10 +76,10 @@ def pick_player(pool_df, team_roster, w_proj=1.0, w_adp=1.0, noise_scale=0.05):
     df = pool_df[pool_df.apply(lambda r: can_add_player(r, team_roster), axis=1)].copy()
     if df.empty:
         return None
-    df["BaseScore"] = w_proj * df["ProjNorm"] + w_adp * df["ADPNorm"]
-    df["StackBonus"] = df.apply(lambda r: compute_stack_bonus(r, team_roster), axis=1)
-    df["Score"] = df["BaseScore"] + df["StackBonus"] + np.random.normal(0, noise_scale, len(df))
-    choice = df.loc[df["Score"].idxmax()]
+    df["basescore"] = w_proj * df["projnorm"] + w_adp * df["adpnorm"]
+    df["stackbonus"] = df.apply(lambda r: compute_stack_bonus(r, team_roster), axis=1)
+    df["score"] = df["basescore"] + df["stackbonus"] + np.random.normal(0, noise_scale, len(df))
+    choice = df.loc[df["score"].idxmax()]
     return choice
 
 def simulate_draft(pool_df, num_teams=12, rounds=6, w_proj=1.0, w_adp=1.0):
@@ -97,14 +97,14 @@ def simulate_draft(pool_df, num_teams=12, rounds=6, w_proj=1.0, w_adp=1.0):
         picks.append({
             "Round": r+1,
             "Team": t+1,
-            "Player": choice["Player"],
-            "Position": choice["Position"],
-            "NFLTeam": choice["NFLTeam"],
-            "ADP": choice.get("ADP", None),
-            "ETRProj": choice.get("ETRProj", None),
-            "UDProj": choice.get("UDProj", None)
+            "Player": choice.get("player", None),
+            "Position": choice.get("position", None),
+            "NFLTeam": choice.get("nflteam", None),
+            "ADP": choice.get("adp", None),
+            "ETRProj": choice.get("etrproj", None),
+            "UDProj": choice.get("udproj", None)
         })
-        available = available[available["Player"] != choice["Player"]]
+        available = available[available["player"] != choice.get("player", None)]
     return pd.DataFrame(picks)
 
 # ----------------------------
@@ -121,22 +121,25 @@ if ud_file and etr_file:
     etr_df = pd.read_csv(etr_file)
 
     # Clean UD
-    ud_df["Player"] = ud_df["firstName"] + " " + ud_df["lastName"]
-    ud_df.rename(columns={"adp":"ADP","projectedPoints":"UDProj","teamName":"NFLTeam"}, inplace=True)
+    ud_df["player"] = ud_df["firstName"] + " " + ud_df["lastName"]
+    ud_df.rename(columns={"adp":"adp","projectedPoints":"udproj","teamName":"nflteam"}, inplace=True)
 
-    # Clean ETR — now using Half PPR Proj
-    etr_df.rename(columns={"Pos":"Position","Team":"NFLTeam","Half PPR Proj":"ETRProj"}, inplace=True)
+    # Clean ETR — use Half PPR Proj
+    etr_df.rename(columns={"Pos":"position","Team":"nflteam","Half PPR Proj":"etrproj"}, inplace=True)
 
     # Merge
-    pool_df = pd.merge(ud_df, etr_df[["Player","Position","NFLTeam","ETRProj"]], on="Player", how="left")
+    pool_df = pd.merge(ud_df, etr_df[["player","position","nflteam","etrproj"]], on="player", how="left")
 
     # Normalize
-    pool_df["ProjNorm"] = normalize_series(pool_df["ETRProj"].fillna(pool_df["UDProj"]))
-    inv_adp = pool_df["ADP"].max() - pool_df["ADP"]
-    pool_df["ADPNorm"] = normalize_series(inv_adp)
+    pool_df["projnorm"] = normalize_series(pool_df["etrproj"].fillna(pool_df["udproj"]))
+    inv_adp = pool_df["adp"].max() - pool_df["adp"]
+    pool_df["adpnorm"] = normalize_series(inv_adp)
+
+    # Normalize column names (lowercase, strip spaces)
+    pool_df.columns = pool_df.columns.str.strip().str.lower()
 
     st.subheader("Merged Player Pool (Half PPR)")
-    expected_cols = ["Player","Position","NFLTeam","ADP","ETRProj","UDProj"]
+    expected_cols = ["player","position","nflteam","adp","etrproj","udproj"]
     available_cols = [c for c in expected_cols if c in pool_df.columns]
     st.dataframe(pool_df[available_cols].head(20))
 
