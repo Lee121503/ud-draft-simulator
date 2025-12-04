@@ -334,9 +334,16 @@ if ud_file and etr_file:
             # Drop players with no ADP value in UD
             avail = avail[avail["adp"].notna()]
     
-            # Optional: also drop OUT players if you want
+            # Drop OUT players if lineupstatus exists
             if "lineupstatus" in avail.columns:
                 avail = avail[~avail["lineupstatus"].str.upper().eq("OUT")]
+    
+            # --- Position filter ---
+            positions = sorted(avail["position"].dropna().unique())
+            selected_pos = st.selectbox("Filter by position:", ["All"] + positions)
+    
+            if selected_pos != "All":
+                avail = avail[avail["position"].str.lower() == selected_pos.lower()]
     
             # Sort by projection and VORP
             best_remaining = avail.sort_values(
@@ -347,7 +354,6 @@ if ud_file and etr_file:
                 best_remaining[["player","position","nflteam","adp","etrproj","udproj","vorp"]],
                 use_container_width=True
             )
-
 
         # Download button
         st.download_button(
