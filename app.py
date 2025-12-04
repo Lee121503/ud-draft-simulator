@@ -325,6 +325,16 @@ if ud_file and etr_file:
         st.subheader("Draft Board (Rounds × Teams)")
         st.dataframe(styled_board)
 
+        # --- Best players remaining ---
+        if not st.session_state.available.empty:
+            st.subheader("Best Players Remaining")
+            best_remaining = st.session_state.available.sort_values(
+                ["etrproj","vorp"], ascending=False
+            ).head(15)  # show top 15
+            st.dataframe(best_remaining[["player","position","nflteam","adp","etrproj","udproj","vorp"]],
+                         use_container_width=True)
+
+
         # Download button
         st.download_button(
             "Download Draft CSV",
