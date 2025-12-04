@@ -80,12 +80,20 @@ def compute_stack_bonus(player_row, team_roster):
     if pos=="qb" and has_wrte: return 0.1
     return 0.0
 
-def pick_player(pool_df, team_roster, w_proj=1.0, w_adp=1.0, noise_scale=0.05):
+def pick_player(pool_df, team_roster, w_proj=1.0, w_adp=1.0, w_vorp=1.0, noise_scale=0.05):
     df = pool_df[pool_df.apply(lambda r: can_add_player(r, team_roster), axis=1)].copy()
-    if df.empty: return None
-    df["basescore"] = w_proj*df["vornorm"] + w_adp*df["adpnorm"]
+    if df.empty: 
+        return None
+
+    # Weighted score using all three sliders
+    df["basescore"] = (
+        w_proj * df["etrproj"] +
+        w_adp  * df["adpnorm"] +
+        w_vorp * df["vornorm"]
+    )
+
     df["stackbonus"] = df.apply(lambda r: compute_stack_bonus(r, team_roster), axis=1)
-    df["score"] = df["basescore"] + df["stackbonus"] + np.random.normal(0,noise_scale,len(df))
+    df["score"] = df["basescore"] + df["stackbonus"] + np.random.normal(0, noise_scale, len(df))
     return df.loc[df["score"].idxmax()]
 
 # ----------------------------
@@ -166,8 +174,6 @@ pool_df["etrproj"] = pool_df["etrproj"].fillna(0)
 pool_df["player_display"] = pool_df["player"]
 
 
-
-
 # Replacement-level cutoffs (12-team defaults)
 replacement_cutoffs = {"qb":12,"rb":24,"wr":36,"te":12}
 vorp_values={}
@@ -193,8 +199,9 @@ st.dataframe(pool_df[available_cols].head(20))
 # Settings
 num_teams=st.sidebar.number_input("Teams",2,20,12)
 rounds=st.sidebar.number_input("Rounds",1,20,6)
-w_proj=st.sidebar.slider("Projection weight",0.0,2.0,1.0,0.1)
-w_adp=st.sidebar.slider("ADP weight",0.0,2.0,1.0,0.1)
+w_proj = st.sidebar.slider("Projection weight", 0.0, 2.0, 1.0, 0.1)
+w_adp  = st.sidebar.slider("ADP weight", 0.0, 2.0, 1.0, 0.1)
+w_vorp = st.sidebar.slider("VORP weight", 0.0, 2.0, 1.0, 0.1)
 
 # --- Team slot selection ---
 slot_mode = st.sidebar.radio("Choose draft slot mode:", ["Random", "Manual"])
@@ -232,7 +239,7 @@ if st.sidebar.button("Advance Draft"):
             break
         else:
             # Simulate other team pick
-            choice = pick_player(st.session_state.available, st.session_state.teams[t], w_proj, w_adp)
+            choice = pick_player(st.session_state.available, st.session_state.teams[t], w_proj, w_adp, w_vorp)
             if choice is not None:
                 assign_player(choice, st.session_state.teams[t])
                 st.session_state.picks.append({
@@ -372,7 +379,8 @@ if not result_df.empty:
             st.session_state.available,
             st.session_state.teams[st.session_state.my_team],
             w_proj,
-            w_adp
+            w_adp,
+            w_vorp
         )
         if recommended is not None:
             st.subheader("Recommended Pick (Computer Suggestion)")
