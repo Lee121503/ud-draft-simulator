@@ -5,6 +5,7 @@ import time
 import random
 import re
 from rapidfuzz import process, fuzz
+st.set_page_config(layout="wide")
 
 ROSTER_TEMPLATE = {"qb":1,"rb":1,"wr":2,"te":1,"flex":1}
 
