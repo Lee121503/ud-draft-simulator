@@ -5,6 +5,13 @@ import time
 import random
 import re
 from rapidfuzz import process, fuzz
+import sqlite3
+
+def save_draft_to_db(df, db_path="drafts.db", table_name="draft_results"):
+    conn = sqlite3.connect(db_path)
+    df.to_sql(table_name, conn, if_exists="append", index=False)
+    conn.close()
+
 st.set_page_config(layout="wide")
 
 ROSTER_TEMPLATE = {"qb":1,"rb":1,"wr":2,"te":1,"flex":1}
@@ -362,3 +369,22 @@ if not result_df.empty:
         file_name=f"drafts_{int(time.time())}.csv",
         mime="text/csv"
     )
+
+    # Save to database
+    if st.button("Save Draft to Database"):
+        try:
+            result_df["saved_at"] = pd.Timestamp.now()
+            save_draft_to_db(result_df)
+            st.success("✅ Draft saved to database!")
+        except Exception as e:
+            st.error(f"❌ Failed to save draft: {e}")
+
+if st.sidebar.checkbox("View Saved Drafts"):
+    try:
+        conn = sqlite3.connect("drafts.db")
+        saved_df = pd.read_sql("SELECT * FROM draft_results", conn)
+        conn.close()
+        st.subheader("Saved Drafts")
+        st.dataframe(saved_df)
+    except Exception as e:
+        st.error(f"❌ Could not load saved drafts: {e}")
