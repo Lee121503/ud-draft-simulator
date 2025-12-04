@@ -138,17 +138,16 @@ if ud_file and etr_file:
         suffixes=("_ud","_etr")
     )
     
-    # --- Backfill missing position/team from UD if ETR didn’t list player ---
-    if "position_ud" in pool_df.columns:
-        pool_df["position"] = pool_df["position"].fillna(pool_df["position_ud"])
-    if "nflteam_ud" in pool_df.columns:
-        pool_df["nflteam"] = pool_df["nflteam"].fillna(pool_df["nflteam_ud"])
+    # Backfill missing position/team from UD
+    pool_df["position"] = pool_df["position"].fillna(pool_df["position_ud"])
+    pool_df["nflteam"] = pool_df["nflteam"].fillna(pool_df["nflteam_ud"])
     
-    # --- Fill missing projections with 0 ---
+    # Fill missing projections with 0
     pool_df["etrproj"] = pool_df["etrproj"].fillna(0)
     
-    # --- Keep original UD display name for UI ---
+    # Keep original UD display name
     pool_df["player_display"] = pool_df["player"]
+
 
     # Replacement-level cutoffs (12-team defaults)
     replacement_cutoffs = {"qb":12,"rb":24,"wr":36,"te":12}
