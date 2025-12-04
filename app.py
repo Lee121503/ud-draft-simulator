@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import time
 import random
+import re
+from rapidfuzz import process, fuzz
 
 ROSTER_TEMPLATE = {"qb":1,"rb":1,"wr":2,"te":1,"flex":1}
 
@@ -102,8 +104,43 @@ if ud_file and etr_file:
     # Clean ETR — use Half PPR Proj
     etr_df.rename(columns={"pos":"position","team":"nflteam","half ppr proj":"etrproj"}, inplace=True)
 
-    merge_cols = [c for c in ["player","position","nflteam","etrproj"] if c in etr_df.columns]
-    pool_df = pd.merge(ud_df, etr_df[merge_cols], on="player", how="left")
+    # --- Name normalization helper ---
+    def normalize_name(name: str) -> str:
+        if not isinstance(name, str):
+            return ""
+        name = name.lower().strip()
+        name = re.sub(r"[^\w\s]", "", name)  # remove punctuation
+        name = re.sub(r"\b(jr|sr|ii|iii|iv|v)\b", "", name)  # remove suffixes
+        # common nickname harmonization
+        name = name.replace("ken ", "kenneth ")
+        name = name.replace("dj ", "deejay ")
+        name = name.replace("aj ", "anthony ")
+        name = re.sub(r"\s+", " ", name).strip()
+        return name
+    
+    # Normalize names
+    ud_df["player_norm"] = ud_df["player"].apply(normalize_name)
+    etr_df["player_norm"] = etr_df["player"].apply(normalize_name)
+    
+    # Fuzzy match UD -> ETR (token sort ratio)
+    etr_names = etr_df["player_norm"].tolist()
+    ud_df["etr_match_norm"] = ud_df["player_norm"].apply(
+        lambda x: process.extractOne(x, etr_names, scorer=fuzz.token_sort_ratio)[0]
+    )
+    
+    # Merge on normalized fuzzy match
+    pool_df = pd.merge(
+        ud_df,
+        etr_df[["player_norm", "position", "nflteam", "etrproj"]],  # keep ETR essentials
+        left_on="etr_match_norm",
+        right_on="player_norm",
+        how="left",
+        suffixes=("_ud","_etr")
+    )
+    
+    # Keep the original UD display name for UI
+    pool_df["player_display"] = pool_df["player"]
+
 
     # Replacement-level cutoffs (12-team defaults)
     replacement_cutoffs = {"qb":12,"rb":24,"wr":36,"te":12}
