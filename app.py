@@ -87,12 +87,12 @@ def pick_player(pool_df, team_roster, w_proj=1.0, w_adp=1.0, noise_scale=0.05):
 st.title("12-Man Draft Simulator (Manual Draft Mode + Draft Board)")
 st.sidebar.header("Upload CSVs")
 
-ud_file = st.sidebar.file_uploader("Upload 12 Man UD CSV", type=["csv"])
-etr_file = st.sidebar.file_uploader("Upload ETR Proj CSV", type=["csv"])
+# Load directly from GitHub raw URLs
+UD_URL = "https://raw.githubusercontent.com/Lee121503/ud-draft-simulator/refs/heads/main/12%20Man%20UD.csv"
+ETR_URL = "https://raw.githubusercontent.com/Lee121503/ud-draft-simulator/refs/heads/main/ETR%20Proj.csv"
 
-if ud_file and etr_file:
-    ud_df = pd.read_csv(ud_file)
-    etr_df = pd.read_csv(etr_file)
+ud_df = pd.read_csv(UD_URL)
+etr_df = pd.read_csv(ETR_URL)
 
     # Normalize column names
     ud_df.columns = ud_df.columns.str.strip().str.lower()
