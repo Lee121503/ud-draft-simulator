@@ -67,7 +67,7 @@ def pick_player(pool_df, team_roster, w_proj=1.0, w_adp=1.0, noise_scale=0.05):
 # ----------------------------
 # Streamlit UI
 # ----------------------------
-st.title("12-Man Draft Simulator (Manual Draft Mode)")
+st.title("12-Man Draft Simulator (Manual Draft Mode + Draft Board)")
 st.sidebar.header("Upload CSVs")
 
 ud_file = st.sidebar.file_uploader("Upload 12 Man UD CSV", type=["csv"])
@@ -119,25 +119,34 @@ if ud_file and etr_file:
     w_proj=st.sidebar.slider("Projection weight",0.0,2.0,1.0,0.1)
     w_adp=st.sidebar.slider("ADP weight",0.0,2.0,1.0,0.1)
 
-    # Randomly assign your team slot
-    my_team = random.randint(0, num_teams-1)
-    st.sidebar.write(f"You are Team {my_team+1}")
+    # --- Persistent state ---
+    if "my_team" not in st.session_state:
+        st.session_state.my_team = random.randint(0, num_teams-1)
+    st.sidebar.write(f"You are Team {st.session_state.my_team+1}")
 
-    if st.sidebar.button("Start Draft"):
-        available = pool_df.copy()
-        teams = [init_team_roster() for _ in range(num_teams)]
-        order = snake_order(num_teams, rounds)
-        picks=[]
-        for r,t in order:
-            if available.empty: break
-            if t == my_team:
+    if "picks" not in st.session_state:
+        st.session_state.picks = []
+    if "available" not in st.session_state:
+        st.session_state.available = pool_df.copy()
+    if "teams" not in st.session_state:
+        st.session_state.teams = [init_team_roster() for _ in range(num_teams)]
+    if "order" not in st.session_state:
+        st.session_state.order = snake_order(num_teams, rounds)
+    if "current_index" not in st.session_state:
+        st.session_state.current_index = 0
+
+    # --- Draft progression ---
+    if st.sidebar.button("Advance Draft"):
+        if st.session_state.current_index < len(st.session_state.order):
+            r,t = st.session_state.order[st.session_state.current_index]
+            if t == st.session_state.my_team:
                 st.subheader(f"Round {r+1}, Your Pick (Team {t+1})")
-                options = available["player"].tolist()
+                options = st.session_state.available["player"].tolist()
                 choice_name = st.selectbox("Select your player:", options, key=f"pick_{r}_{t}")
                 if st.button("Confirm Pick", key=f"confirm_{r}_{t}"):
-                    choice = available[available["player"]==choice_name].iloc[0]
-                    assign_player(choice, teams[t])
-                    picks.append({
+                    choice = st.session_state.available[st.session_state.available["player"]==choice_name].iloc[0]
+                    assign_player(choice, st.session_state.teams[t])
+                    st.session_state.picks.append({
                         "Round":r+1,"Team":t+1,
                         "Player":choice.get("player",None),
                         "Position":choice.get("position",None),
@@ -147,30 +156,42 @@ if ud_file and etr_file:
                         "UDProj":choice.get("udproj",None),
                         "VORP":choice.get("vorp",None)
                     })
-                    available = available[available["player"]!=choice_name]
+                    st.session_state.available = st.session_state.available[st.session_state.available["player"]!=choice_name]
+                    st.session_state.current_index += 1
             else:
-                choice = pick_player(available, teams[t], w_proj, w_adp)
-                if choice is None: continue
-                assign_player(choice, teams[t])
-                picks.append({
-                    "Round":r+1,"Team":t+1,
-                    "Player":choice.get("player",None),
-                    "Position":choice.get("position",None),
-                    "NFLTeam":choice.get("nflteam",None),
-                    "ADP":choice.get("adp",None),
-                    "ETRProj":choice.get("etrproj",None),
-                    "UDProj":choice.get("udproj",None),
-                    "VORP":choice.get("vorp",None)
-                })
-                available = available[available["player"]!=choice.get("player",None)]
+                choice = pick_player(st.session_state.available, st.session_state.teams[t], w_proj, w_adp)
+                if choice is not None:
+                    assign_player(choice, st.session_state.teams[t])
+                    st.session_state.picks.append({
+                        "Round": r+1, "Team": t+1,
+                        "Player": choice.get("player", None),
+                        "Position": choice.get("position", None),
+                        "NFLTeam": choice.get("nflteam", None),
+                        "ADP": choice.get("adp", None),
+                        "ETRProj": choice.get("etrproj", None),
+                        "UDProj": choice.get("udproj", None),
+                        "VORP": choice.get("vorp", None)
+                    })
+                    st.session_state.available = st.session_state.available[
+                        st.session_state.available["player"] != choice.get("player", None)
+                    ]
+                st.session_state.current_index += 1
 
-        result_df = pd.DataFrame(picks)
-        st.subheader("Draft Results")
-        st.dataframe(result_df)
+        # --- Show results so far ---
+        result_df = pd.DataFrame(st.session_state.picks)
+        if not result_df.empty:
+            st.subheader("Draft Results")
+            st.dataframe(result_df)
 
-        st.download_button(
-            "Download Draft CSV",
-            result_df.to_csv(index=False).encode("utf-8"),
-            file_name=f"drafts_{int(time.time())}.csv",
-            mime="text/csv"
-        )
+            # Draft board view (Rounds × Teams grid)
+            board = result_df.pivot(index="Round", columns="Team", values="Player")
+            st.subheader("Draft Board (Rounds × Teams)")
+            st.dataframe(board)
+
+            # Download button
+            st.download_button(
+                "Download Draft CSV",
+                result_df.to_csv(index=False).encode("utf-8"),
+                file_name=f"drafts_{int(time.time())}.csv",
+                mime="text/csv"
+            )
