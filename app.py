@@ -94,9 +94,9 @@ ETR_URL = "https://raw.githubusercontent.com/Lee121503/ud-draft-simulator/refs/h
 ud_df = pd.read_csv(UD_URL)
 etr_df = pd.read_csv(ETR_URL)
 
-    # Normalize column names
-    ud_df.columns = ud_df.columns.str.strip().str.lower()
-    etr_df.columns = etr_df.columns.str.strip().str.lower()
+# Normalize column names
+ud_df.columns = ud_df.columns.str.strip().str.lower()
+etr_df.columns = etr_df.columns.str.strip().str.lower()
 
     # Clean UD
     ud_df["player"] = ud_df["firstname"] + " " + ud_df["lastname"]
