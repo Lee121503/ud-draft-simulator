@@ -120,23 +120,25 @@ if ud_file and etr_file:
     ud_df = pd.read_csv(ud_file)
     etr_df = pd.read_csv(etr_file)
 
+    # Normalize column names
+    ud_df.columns = ud_df.columns.str.strip().str.lower()
+    etr_df.columns = etr_df.columns.str.strip().str.lower()
+
     # Clean UD
-    ud_df["player"] = ud_df["firstName"] + " " + ud_df["lastName"]
-    ud_df.rename(columns={"adp":"adp","projectedPoints":"udproj","teamName":"nflteam"}, inplace=True)
+    ud_df["player"] = ud_df["firstname"] + " " + ud_df["lastname"]
+    ud_df.rename(columns={"adp":"adp","projectedpoints":"udproj","teamname":"nflteam"}, inplace=True)
 
     # Clean ETR — use Half PPR Proj
-    etr_df.rename(columns={"Pos":"position","Team":"nflteam","Half PPR Proj":"etrproj"}, inplace=True)
+    etr_df.rename(columns={"pos":"position","team":"nflteam","half ppr proj":"etrproj"}, inplace=True)
 
-    # Merge
-    pool_df = pd.merge(ud_df, etr_df[["player","position","nflteam","etrproj"]], on="player", how="left")
+    # Merge safely (only include columns that exist)
+    merge_cols = [c for c in ["player","position","nflteam","etrproj"] if c in etr_df.columns]
+    pool_df = pd.merge(ud_df, etr_df[merge_cols], on="player", how="left")
 
     # Normalize
     pool_df["projnorm"] = normalize_series(pool_df["etrproj"].fillna(pool_df["udproj"]))
     inv_adp = pool_df["adp"].max() - pool_df["adp"]
     pool_df["adpnorm"] = normalize_series(inv_adp)
-
-    # Normalize column names (lowercase, strip spaces)
-    pool_df.columns = pool_df.columns.str.strip().str.lower()
 
     st.subheader("Merged Player Pool (Half PPR)")
     expected_cols = ["player","position","nflteam","adp","etrproj","udproj"]
