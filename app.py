@@ -119,246 +119,246 @@ def normalize_name(name: str) -> str:
     name = re.sub(r"\s+", " ", name).strip()
     return name
     
-    # --- Normalize names ---
-    ud_df["player"] = ud_df["firstname"] + " " + ud_df["lastname"]
-    ud_df["player_norm"] = ud_df["player"].apply(normalize_name)
-    etr_df["player_norm"] = etr_df["player"].apply(normalize_name)
+# --- Normalize names ---
+ud_df["player"] = ud_df["firstname"] + " " + ud_df["lastname"]
+ud_df["player_norm"] = ud_df["player"].apply(normalize_name)
+etr_df["player_norm"] = etr_df["player"].apply(normalize_name)
     
-    # --- Fuzzy match UD -> ETR ---
-    etr_names = etr_df["player_norm"].tolist()
-    ud_df["etr_match_norm"] = ud_df["player_norm"].apply(
-        lambda x: process.extractOne(x, etr_names, scorer=fuzz.token_sort_ratio)[0]
-    )
+# --- Fuzzy match UD -> ETR ---
+etr_names = etr_df["player_norm"].tolist()
+ud_df["etr_match_norm"] = ud_df["player_norm"].apply(
+    lambda x: process.extractOne(x, etr_names, scorer=fuzz.token_sort_ratio)[0]
+)
     
-    # --- Merge: keep UD’s position/team, bring in ETR projection ---
-    pool_df = pd.merge(
-        ud_df[["player","player_norm","etr_match_norm","adp","udproj","slotname","nflteam"]],
-        etr_df[["player_norm","position","nflteam","etrproj"]],
-        left_on="etr_match_norm",
-        right_on="player_norm",
-        how="left",
-        suffixes=("_ud","_etr")
-    )
+# --- Merge: keep UD’s position/team, bring in ETR projection ---
+pool_df = pd.merge(
+    ud_df[["player","player_norm","etr_match_norm","adp","udproj","slotname","nflteam"]],
+    etr_df[["player_norm","position","nflteam","etrproj"]],
+    left_on="etr_match_norm",
+    right_on="player_norm",
+    how="left",
+    suffixes=("_ud","_etr")
+)
     
-    # Rename for clarity
-    pool_df.rename(columns={
-        "slotname":"position_ud",
-        "position":"position_etr",
-        "nflteam_ud":"nflteam_ud",
-        "nflteam_etr":"nflteam_etr"
-    }, inplace=True)
+# Rename for clarity
+pool_df.rename(columns={
+    "slotname":"position_ud",
+    "position":"position_etr",
+    "nflteam_ud":"nflteam_ud",
+    "nflteam_etr":"nflteam_etr"
+}, inplace=True)
     
-    # Backfill: use UD team if ETR missing
-    pool_df["position"] = pool_df["position_ud"].fillna(pool_df["position_etr"])
-    pool_df["nflteam"] = pool_df["nflteam_ud"].fillna(pool_df["nflteam_etr"])
+# Backfill: use UD team if ETR missing
+pool_df["position"] = pool_df["position_ud"].fillna(pool_df["position_etr"])
+pool_df["nflteam"] = pool_df["nflteam_ud"].fillna(pool_df["nflteam_etr"])
     
-    # Fill missing projections with 0
-    pool_df["etrproj"] = pool_df["etrproj"].fillna(0)
+# Fill missing projections with 0
+pool_df["etrproj"] = pool_df["etrproj"].fillna(0)
     
-    # Keep original UD display name
-    pool_df["player_display"] = pool_df["player"]
+# Keep original UD display name
+pool_df["player_display"] = pool_df["player"]
 
 
 
 
-    # Replacement-level cutoffs (12-team defaults)
-    replacement_cutoffs = {"qb":12,"rb":24,"wr":36,"te":12}
-    vorp_values={}
-    for pos,cutoff in replacement_cutoffs.items():
-        pos_df = pool_df[pool_df["position"].str.lower()==pos].sort_values("etrproj",ascending=False)
-        if len(pos_df)>=cutoff:
-            vorp_values[pos] = pos_df.iloc[cutoff-1]["etrproj"]
+# Replacement-level cutoffs (12-team defaults)
+replacement_cutoffs = {"qb":12,"rb":24,"wr":36,"te":12}
+vorp_values={}
+for pos,cutoff in replacement_cutoffs.items():
+    pos_df = pool_df[pool_df["position"].str.lower()==pos].sort_values("etrproj",ascending=False)
+    if len(pos_df)>=cutoff:
+        vorp_values[pos] = pos_df.iloc[cutoff-1]["etrproj"]
+    else:
+        vorp_values[pos] = pos_df["etrproj"].min() if not pos_df.empty else 0
+
+pool_df["vorp"] = pool_df.apply(lambda r: r["etrproj"]-vorp_values.get(str(r.get("position","")).lower(),0), axis=1)
+
+# Normalize VORP and ADP
+pool_df["vornorm"] = normalize_series(pool_df["vorp"].fillna(0))
+inv_adp = pool_df["adp"].max()-pool_df["adp"]
+pool_df["adpnorm"] = normalize_series(inv_adp)
+
+st.subheader("Merged Player Pool (Half PPR + VORP)")
+expected_cols=["player","position","nflteam","adp","etrproj","udproj","vorp"]
+available_cols=[c for c in expected_cols if c in pool_df.columns]
+st.dataframe(pool_df[available_cols].head(20))
+
+# Settings
+num_teams=st.sidebar.number_input("Teams",2,20,12)
+rounds=st.sidebar.number_input("Rounds",1,20,6)
+w_proj=st.sidebar.slider("Projection weight",0.0,2.0,1.0,0.1)
+w_adp=st.sidebar.slider("ADP weight",0.0,2.0,1.0,0.1)
+
+# --- Team slot selection ---
+slot_mode = st.sidebar.radio("Choose draft slot mode:", ["Random", "Manual"])
+    
+if slot_mode == "Random":
+    if "my_team" not in st.session_state:
+        st.session_state.my_team = random.randint(0, num_teams-1)
+else:  # Manual
+    manual_slot = st.sidebar.number_input("Select your draft slot (1–12)", 1, num_teams, 1)
+    st.session_state.my_team = manual_slot - 1  # zero-based index
+    
+st.sidebar.write(f"You are Team {st.session_state.my_team+1}")
+
+if "picks" not in st.session_state:
+    st.session_state.picks = []
+if "available" not in st.session_state:
+    st.session_state.available = pool_df.copy()
+if "teams" not in st.session_state:
+    st.session_state.teams = [init_team_roster() for _ in range(num_teams)]
+if "order" not in st.session_state:
+    st.session_state.order = snake_order(num_teams, rounds)
+if "current_index" not in st.session_state:
+    st.session_state.current_index = 0
+if "awaiting_pick" not in st.session_state:
+    st.session_state.awaiting_pick = False
+
+# --- Advance Draft ---
+if st.sidebar.button("Advance Draft"):
+    while st.session_state.current_index < len(st.session_state.order):
+        r, t = st.session_state.order[st.session_state.current_index]
+    
+        if t == st.session_state.my_team:
+            # Stop when it's your turn
+            st.session_state.awaiting_pick = True
+            break
         else:
-            vorp_values[pos] = pos_df["etrproj"].min() if not pos_df.empty else 0
+            # Simulate other team pick
+            choice = pick_player(st.session_state.available, st.session_state.teams[t], w_proj, w_adp)
+            if choice is not None:
+                assign_player(choice, st.session_state.teams[t])
+                st.session_state.picks.append({
+                    "Round": r+1, "Team": t+1,
+                    "Player": choice.get("player", None),
+                    "Position": choice.get("position", None),
+                    "NFLTeam": choice.get("nflteam", None),
+                    "ADP": choice.get("adp", None),
+                    "ETRProj": choice.get("etrproj", None),
+                    "UDProj": choice.get("udproj", None),
+                    "VORP": choice.get("vorp", None)
+                })
+                st.session_state.available = st.session_state.available[
+                    st.session_state.available["player"] != choice.get("player", None)
+                ]
+            st.session_state.current_index += 1
 
-    pool_df["vorp"] = pool_df.apply(lambda r: r["etrproj"]-vorp_values.get(str(r.get("position","")).lower(),0), axis=1)
 
-    # Normalize VORP and ADP
-    pool_df["vornorm"] = normalize_series(pool_df["vorp"].fillna(0))
-    inv_adp = pool_df["adp"].max()-pool_df["adp"]
-    pool_df["adpnorm"] = normalize_series(inv_adp)
+# --- Reset Draft ---
+if st.sidebar.button("Reset Draft"):
+    st.session_state.picks = []
+    st.session_state.available = pool_df.copy()
+    st.session_state.teams = [init_team_roster() for _ in range(num_teams)]
+    st.session_state.order = snake_order(num_teams, rounds)
+    st.session_state.current_index = 0
+    st.session_state.awaiting_pick = False
+    st.success("Draft has been reset. Start again!")
 
-    st.subheader("Merged Player Pool (Half PPR + VORP)")
-    expected_cols=["player","position","nflteam","adp","etrproj","udproj","vorp"]
-    available_cols=[c for c in expected_cols if c in pool_df.columns]
-    st.dataframe(pool_df[available_cols].head(20))
+# --- Show results so far ---
+result_df = pd.DataFrame(st.session_state.picks)
+if not result_df.empty:
+    st.subheader("Draft Results")
+    st.dataframe(result_df)
 
-    # Settings
-    num_teams=st.sidebar.number_input("Teams",2,20,12)
-    rounds=st.sidebar.number_input("Rounds",1,20,6)
-    w_proj=st.sidebar.slider("Projection weight",0.0,2.0,1.0,0.1)
-    w_adp=st.sidebar.slider("ADP weight",0.0,2.0,1.0,0.1)
-
-    # --- Team slot selection ---
-    slot_mode = st.sidebar.radio("Choose draft slot mode:", ["Random", "Manual"])
+    # --- Manual Pick UI ---
+    if st.session_state.awaiting_pick:
+        r, t = st.session_state.order[st.session_state.current_index]
+        st.subheader(f"Round {r+1}, Your Pick (Team {t+1})")
+        options = st.session_state.available["player"].tolist()
+        choice_name = st.selectbox("Select your player:", options, key=f"pick_{r}_{t}")
     
-    if slot_mode == "Random":
-        if "my_team" not in st.session_state:
-            st.session_state.my_team = random.randint(0, num_teams-1)
-    else:  # Manual
-        manual_slot = st.sidebar.number_input("Select your draft slot (1–12)", 1, num_teams, 1)
-        st.session_state.my_team = manual_slot - 1  # zero-based index
+        if st.button("Confirm Pick", key=f"confirm_{r}_{t}"):
+            choice = st.session_state.available[
+                st.session_state.available["player"] == choice_name
+            ].iloc[0]
     
-    st.sidebar.write(f"You are Team {st.session_state.my_team+1}")
-
-    if "picks" not in st.session_state:
-        st.session_state.picks = []
-    if "available" not in st.session_state:
-        st.session_state.available = pool_df.copy()
-    if "teams" not in st.session_state:
-        st.session_state.teams = [init_team_roster() for _ in range(num_teams)]
-    if "order" not in st.session_state:
-        st.session_state.order = snake_order(num_teams, rounds)
-    if "current_index" not in st.session_state:
-        st.session_state.current_index = 0
-    if "awaiting_pick" not in st.session_state:
-        st.session_state.awaiting_pick = False
-
-    # --- Advance Draft ---
-    if st.sidebar.button("Advance Draft"):
-        while st.session_state.current_index < len(st.session_state.order):
-            r, t = st.session_state.order[st.session_state.current_index]
-    
-            if t == st.session_state.my_team:
-                # Stop when it's your turn
-                st.session_state.awaiting_pick = True
-                break
-            else:
-                # Simulate other team pick
-                choice = pick_player(st.session_state.available, st.session_state.teams[t], w_proj, w_adp)
-                if choice is not None:
-                    assign_player(choice, st.session_state.teams[t])
-                    st.session_state.picks.append({
-                        "Round": r+1, "Team": t+1,
-                        "Player": choice.get("player", None),
-                        "Position": choice.get("position", None),
-                        "NFLTeam": choice.get("nflteam", None),
-                        "ADP": choice.get("adp", None),
-                        "ETRProj": choice.get("etrproj", None),
-                        "UDProj": choice.get("udproj", None),
-                        "VORP": choice.get("vorp", None)
-                    })
-                    st.session_state.available = st.session_state.available[
-                        st.session_state.available["player"] != choice.get("player", None)
-                    ]
+            if can_add_player(choice, st.session_state.teams[t]):
+                # ✅ valid pick
+                assign_player(choice, st.session_state.teams[t])
+                st.session_state.picks.append({
+                    "Round": r+1, "Team": t+1,
+                    "Player": choice.get("player", None),
+                    "Position": choice.get("position", None),
+                    "NFLTeam": choice.get("nflteam", None),
+                    "ADP": choice.get("adp", None),
+                    "ETRProj": choice.get("etrproj", None),
+                    "UDProj": choice.get("udproj", None),
+                    "VORP": choice.get("vorp", None)
+                })
+                st.session_state.available = st.session_state.available[
+                    st.session_state.available["player"] != choice_name
+                ]
                 st.session_state.current_index += 1
+                st.session_state.awaiting_pick = False
+            else:
+                # ❌ invalid pick — stay on your turn
+                st.warning("Roster restriction prevents adding this player. Please select another.")
 
+    # Draft board view (Rounds × Teams grid)
+    board = result_df.pivot(index="Round", columns="Team", values="Player")
+    pos_board = result_df.pivot(index="Round", columns="Team", values="Position")
 
-    # --- Reset Draft ---
-    if st.sidebar.button("Reset Draft"):
-        st.session_state.picks = []
-        st.session_state.available = pool_df.copy()
-        st.session_state.teams = [init_team_roster() for _ in range(num_teams)]
-        st.session_state.order = snake_order(num_teams, rounds)
-        st.session_state.current_index = 0
-        st.session_state.awaiting_pick = False
-        st.success("Draft has been reset. Start again!")
-
-    # --- Show results so far ---
-    result_df = pd.DataFrame(st.session_state.picks)
-    if not result_df.empty:
-        st.subheader("Draft Results")
-        st.dataframe(result_df)
-
-        # --- Manual Pick UI ---
-        if st.session_state.awaiting_pick:
-            r, t = st.session_state.order[st.session_state.current_index]
-            st.subheader(f"Round {r+1}, Your Pick (Team {t+1})")
-            options = st.session_state.available["player"].tolist()
-            choice_name = st.selectbox("Select your player:", options, key=f"pick_{r}_{t}")
-    
-            if st.button("Confirm Pick", key=f"confirm_{r}_{t}"):
-                choice = st.session_state.available[
-                    st.session_state.available["player"] == choice_name
-                ].iloc[0]
-    
-                if can_add_player(choice, st.session_state.teams[t]):
-                    # ✅ valid pick
-                    assign_player(choice, st.session_state.teams[t])
-                    st.session_state.picks.append({
-                        "Round": r+1, "Team": t+1,
-                        "Player": choice.get("player", None),
-                        "Position": choice.get("position", None),
-                        "NFLTeam": choice.get("nflteam", None),
-                        "ADP": choice.get("adp", None),
-                        "ETRProj": choice.get("etrproj", None),
-                        "UDProj": choice.get("udproj", None),
-                        "VORP": choice.get("vorp", None)
-                    })
-                    st.session_state.available = st.session_state.available[
-                        st.session_state.available["player"] != choice_name
-                    ]
-                    st.session_state.current_index += 1
-                    st.session_state.awaiting_pick = False
-                else:
-                    # ❌ invalid pick — stay on your turn
-                    st.warning("Roster restriction prevents adding this player. Please select another.")
-
-        # Draft board view (Rounds × Teams grid)
-        board = result_df.pivot(index="Round", columns="Team", values="Player")
-        pos_board = result_df.pivot(index="Round", columns="Team", values="Position")
-
-        def color_positions(val, pos):
-            if pos is None:
-                return ""
-            pos = str(pos).lower()
-            if pos == "rb":
-                return "background-color: lightgreen"
-            elif pos == "wr":
-                return "background-color: khaki"
-            elif pos == "qb":
-                return "background-color: plum"
-            elif pos == "te":
-                return "background-color: lightblue"
+    def color_positions(val, pos):
+        if pos is None:
             return ""
+        pos = str(pos).lower()
+        if pos == "rb":
+            return "background-color: lightgreen"
+        elif pos == "wr":
+            return "background-color: khaki"
+        elif pos == "qb":
+            return "background-color: plum"
+        elif pos == "te":
+            return "background-color: lightblue"
+        return ""
 
-        # Build a DataFrame of styles with same shape as board
-        styles = pd.DataFrame(
-            [[color_positions(board.iloc[i, j], pos_board.iloc[i, j])
-              for j in range(board.shape[1])]
-             for i in range(board.shape[0])],
-            index=board.index, columns=board.columns
+    # Build a DataFrame of styles with same shape as board
+    styles = pd.DataFrame(
+        [[color_positions(board.iloc[i, j], pos_board.iloc[i, j])
+            for j in range(board.shape[1])]
+            for i in range(board.shape[0])],
+        index=board.index, columns=board.columns
+    )
+
+    styled_board = board.style.apply(lambda _: styles, axis=None)
+
+    st.subheader("Draft Board (Rounds × Teams)")
+    st.dataframe(styled_board)
+
+    # --- Best players remaining ---
+    if not st.session_state.available.empty:
+        st.subheader("Best Players Remaining")
+    
+        avail = st.session_state.available.copy()
+    
+        # Drop players with no ADP value in UD
+        avail = avail[avail["adp"].notna()]
+    
+        # Drop OUT players if lineupstatus exists
+        if "lineupstatus" in avail.columns:
+            avail = avail[~avail["lineupstatus"].str.upper().eq("OUT")]
+    
+        # --- Position filter ---
+        positions = sorted(avail["position"].dropna().unique())
+        selected_pos = st.selectbox("Filter by position:", ["All"] + positions)
+    
+        if selected_pos != "All":
+            avail = avail[avail["position"].str.lower() == selected_pos.lower()]
+    
+        # Sort by projection and VORP
+        best_remaining = avail.sort_values(
+            ["etrproj","vorp"], ascending=False
+        ).head(48)
+    
+        st.dataframe(
+            best_remaining[["player","position","nflteam","adp","etrproj","udproj","vorp"]],
+            use_container_width=True
         )
 
-        styled_board = board.style.apply(lambda _: styles, axis=None)
-
-        st.subheader("Draft Board (Rounds × Teams)")
-        st.dataframe(styled_board)
-
-        # --- Best players remaining ---
-        if not st.session_state.available.empty:
-            st.subheader("Best Players Remaining")
-    
-            avail = st.session_state.available.copy()
-    
-            # Drop players with no ADP value in UD
-            avail = avail[avail["adp"].notna()]
-    
-            # Drop OUT players if lineupstatus exists
-            if "lineupstatus" in avail.columns:
-                avail = avail[~avail["lineupstatus"].str.upper().eq("OUT")]
-    
-            # --- Position filter ---
-            positions = sorted(avail["position"].dropna().unique())
-            selected_pos = st.selectbox("Filter by position:", ["All"] + positions)
-    
-            if selected_pos != "All":
-                avail = avail[avail["position"].str.lower() == selected_pos.lower()]
-    
-            # Sort by projection and VORP
-            best_remaining = avail.sort_values(
-                ["etrproj","vorp"], ascending=False
-            ).head(48)
-    
-            st.dataframe(
-                best_remaining[["player","position","nflteam","adp","etrproj","udproj","vorp"]],
-                use_container_width=True
-            )
-
-        # Download button
-        st.download_button(
-            "Download Draft CSV",
-            result_df.to_csv(index=False).encode("utf-8"),
-            file_name=f"drafts_{int(time.time())}.csv",
-            mime="text/csv"
-        )
+    # Download button
+    st.download_button(
+        "Download Draft CSV",
+        result_df.to_csv(index=False).encode("utf-8"),
+        file_name=f"drafts_{int(time.time())}.csv",
+        mime="text/csv"
+    )
