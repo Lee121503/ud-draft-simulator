@@ -135,22 +135,21 @@ if ud_file and etr_file:
         etr_df[["player_norm","position","nflteam","etrproj"]],
         left_on="etr_match_norm",
         right_on="player_norm",
-        how="left"
+        how="left",
+        suffixes=("_ud","_etr")
     )
- 
-    # Standardize column names
+    
+    # Rename for clarity
     pool_df.rename(columns={
         "slotname":"position_ud",
         "position":"position_etr",
-        "nflteam":"nflteam_etr"
+        "nflteam_ud":"nflteam_ud",
+        "nflteam_etr":"nflteam_etr"
     }, inplace=True)
     
-    # Backfill from UD if ETR missing
+    # Backfill: use UD team if ETR missing
     pool_df["position"] = pool_df["position_ud"].fillna(pool_df["position_etr"])
-    pool_df["nflteam"] = pool_df["nflteam"].fillna(pool_df["nflteam_etr"])
-    pool_df["etrproj"] = pool_df["etrproj"].fillna(0)
-    
-    pool_df["player_display"] = pool_df["player"]
+    pool_df["nflteam"] = pool_df["nflteam_ud"].fillna(pool_df["nflteam_etr"])
     
     # Fill missing projections with 0
     pool_df["etrproj"] = pool_df["etrproj"].fillna(0)
