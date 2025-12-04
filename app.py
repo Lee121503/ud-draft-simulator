@@ -146,11 +146,15 @@ if ud_file and etr_file:
 
     # --- Advance Draft ---
     if st.sidebar.button("Advance Draft"):
-        if st.session_state.current_index < len(st.session_state.order):
-            r,t = st.session_state.order[st.session_state.current_index]
+        while st.session_state.current_index < len(st.session_state.order):
+            r, t = st.session_state.order[st.session_state.current_index]
+    
             if t == st.session_state.my_team:
+                # Stop when it's your turn
                 st.session_state.awaiting_pick = True
+                break
             else:
+                # Simulate other team pick
                 choice = pick_player(st.session_state.available, st.session_state.teams[t], w_proj, w_adp)
                 if choice is not None:
                     assign_player(choice, st.session_state.teams[t])
@@ -168,6 +172,7 @@ if ud_file and etr_file:
                         st.session_state.available["player"] != choice.get("player", None)
                     ]
                 st.session_state.current_index += 1
+
 
     # --- Reset Draft ---
     if st.sidebar.button("Reset Draft"):
