@@ -345,12 +345,16 @@ if not result_df.empty:
         if "lineupstatus" in avail.columns:
             avail = avail[~avail["lineupstatus"].str.upper().eq("OUT")]
     
-        # --- Position filter ---
+        # --- Position filter with Flex option ---
         positions = sorted(avail["position"].dropna().unique())
-        selected_pos = st.selectbox("Filter by position:", ["All"] + positions)
+        filter_options = ["All", "Flex"] + positions
+        selected_pos = st.selectbox("Filter by position:", filter_options)
     
         if selected_pos != "All":
-            avail = avail[avail["position"].str.lower() == selected_pos.lower()]
+            if selected_pos == "Flex":
+                avail = avail[avail["position"].str.lower().isin(["rb","wr","te"])]
+            else:
+                avail = avail[avail["position"].str.lower() == selected_pos.lower()]
     
         # Sort by projection and VORP
         best_remaining = avail.sort_values(
@@ -361,6 +365,7 @@ if not result_df.empty:
             best_remaining[["player","position","nflteam","adp","etrproj","udproj","vorp"]],
             use_container_width=True
         )
+
 
     # Download button
     st.download_button(
