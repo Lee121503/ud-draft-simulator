@@ -100,8 +100,9 @@ def simulate_draft(pool_df, num_teams=12, rounds=6, w_proj=1.0, w_adp=1.0):
             "Player": choice["Player"],
             "Position": choice["Position"],
             "NFLTeam": choice["NFLTeam"],
-            "ADP": choice["ADP"],
-            "ETRProj": choice["ETRProj"]
+            "ADP": choice.get("ADP", None),
+            "ETRProj": choice.get("ETRProj", None),
+            "UDProj": choice.get("UDProj", None)
         })
         available = available[available["Player"] != choice["Player"]]
     return pd.DataFrame(picks)
@@ -135,7 +136,10 @@ if ud_file and etr_file:
     pool_df["ADPNorm"] = normalize_series(inv_adp)
 
     st.subheader("Merged Player Pool")
-    st.dataframe(pool_df[["Player","Position","NFLTeam","ADP","ETRProj","UDProj"]].head(20))
+    # Show only available columns to avoid KeyError
+    expected_cols = ["Player","Position","NFLTeam","ADP","ETRProj","UDProj"]
+    available_cols = [c for c in expected_cols if c in pool_df.columns]
+    st.dataframe(pool_df[available_cols].head(20))
 
     # Settings
     num_teams = st.sidebar.number_input("Teams", 2, 20, 12)
@@ -159,4 +163,3 @@ if ud_file and etr_file:
 
 else:
     st.info("Upload both 12 Man UD.csv and ETR Proj.csv to start.")
-
