@@ -172,22 +172,28 @@ if ud_file and etr_file:
             choice = st.session_state.available[
                 st.session_state.available["player"] == choice_name
             ].iloc[0]
-            assign_player(choice, st.session_state.teams[t])
-            st.session_state.picks.append({
-                "Round": r+1, "Team": t+1,
-                "Player": choice.get("player", None),
-                "Position": choice.get("position", None),
-                "NFLTeam": choice.get("nflteam", None),
-                "ADP": choice.get("adp", None),
-                "ETRProj": choice.get("etrproj", None),
-                "UDProj": choice.get("udproj", None),
-                "VORP": choice.get("vorp", None)
-            })
-            st.session_state.available = st.session_state.available[
-                st.session_state.available["player"] != choice_name
-            ]
-            st.session_state.current_index += 1
-            st.session_state.awaiting_pick = False
+    
+            # ✅ enforce roster restrictions
+            if can_add_player(choice, st.session_state.teams[t]):
+                assign_player(choice, st.session_state.teams[t])
+                st.session_state.picks.append({
+                    "Round": r+1, "Team": t+1,
+                    "Player": choice.get("player", None),
+                    "Position": choice.get("position", None),
+                    "NFLTeam": choice.get("nflteam", None),
+                    "ADP": choice.get("adp", None),
+                    "ETRProj": choice.get("etrproj", None),
+                    "UDProj": choice.get("udproj", None),
+                    "VORP": choice.get("vorp", None)
+                })
+                st.session_state.available = st.session_state.available[
+                    st.session_state.available["player"] != choice_name
+                ]
+                st.session_state.current_index += 1
+                st.session_state.awaiting_pick = False
+            else:
+                st.warning("Roster restriction prevents adding this player. Please select another.")
+
 
     # --- Show results so far ---
     result_df = pd.DataFrame(st.session_state.picks)
