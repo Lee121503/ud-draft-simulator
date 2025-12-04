@@ -175,6 +175,7 @@ if ud_file and etr_file:
             ].iloc[0]
 
             if can_add_player(choice, st.session_state.teams[t]):
+                # ✅ valid pick
                 assign_player(choice, st.session_state.teams[t])
                 st.session_state.picks.append({
                     "Round": r+1, "Team": t+1,
@@ -192,6 +193,7 @@ if ud_file and etr_file:
                 st.session_state.current_index += 1
                 st.session_state.awaiting_pick = False
             else:
+                # ❌ invalid pick — stay on your turn
                 st.warning("Roster restriction prevents adding this player. Please select another.")
 
     # --- Show results so far ---
@@ -202,12 +204,9 @@ if ud_file and etr_file:
 
         # Draft board view (Rounds × Teams grid)
         board = result_df.pivot(index="Round", columns="Team", values="Player")
+        pos_board = result_df.pivot(index="Round", columns="Team", values="Position")
 
-        # Position map for styling
-        pos_map = result_df.set_index(["Round","Team"])["Position"]
-
-        def color_positions(val, row, col):
-            pos = pos_map.get((row, col), None)
+        def color_positions(val, pos):
             if pos is None:
                 return ""
             pos = str(pos).lower()
@@ -221,13 +220,15 @@ if ud_file and etr_file:
                 return "background-color: lightblue"
             return ""
 
-        styled_board = board.style.apply(
-            lambda df: [
-                [color_positions(df.iloc[i,j], df.index[i], df.columns[j]) for j in range(df.shape[1])]
-                for i in range(df.shape[0])
-            ],
-            axis=None
+        # Build a DataFrame of styles with same shape as board
+        styles = pd.DataFrame(
+            [[color_positions(board.iloc[i, j], pos_board.iloc[i, j])
+              for j in range(board.shape[1])]
+             for i in range(board.shape[0])],
+            index=board.index, columns=board.columns
         )
+
+        styled_board = board.style.apply(lambda _: styles, axis=None)
 
         st.subheader("Draft Board (Rounds × Teams)")
         st.dataframe(styled_board)
