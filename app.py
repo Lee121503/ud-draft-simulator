@@ -119,9 +119,16 @@ if ud_file and etr_file:
     w_proj=st.sidebar.slider("Projection weight",0.0,2.0,1.0,0.1)
     w_adp=st.sidebar.slider("ADP weight",0.0,2.0,1.0,0.1)
 
-    # --- Persistent state ---
-    if "my_team" not in st.session_state:
-        st.session_state.my_team = random.randint(0, num_teams-1)
+    # --- Team slot selection ---
+    slot_mode = st.sidebar.radio("Choose draft slot mode:", ["Random", "Manual"])
+    
+    if slot_mode == "Random":
+        if "my_team" not in st.session_state:
+            st.session_state.my_team = random.randint(0, num_teams-1)
+    else:  # Manual
+        manual_slot = st.sidebar.number_input("Select your draft slot (1–12)", 1, num_teams, 1)
+        st.session_state.my_team = manual_slot - 1  # zero-based index
+    
     st.sidebar.write(f"You are Team {st.session_state.my_team+1}")
 
     if "picks" not in st.session_state:
