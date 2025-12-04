@@ -150,11 +150,6 @@ if ud_file and etr_file:
     # --- Keep original UD display name for UI ---
     pool_df["player_display"] = pool_df["player"]
 
-    
-    # Keep the original UD display name for UI
-    pool_df["player_display"] = pool_df["player"]
-
-
     # Replacement-level cutoffs (12-team defaults)
     replacement_cutoffs = {"qb":12,"rb":24,"wr":36,"te":12}
     vorp_values={}
