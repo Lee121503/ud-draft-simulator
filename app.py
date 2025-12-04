@@ -131,12 +131,13 @@ if ud_file and etr_file:
     
     # --- Merge: keep UD’s position/team, bring in ETR projection ---
     pool_df = pd.merge(
-        ud_df[["player","player_norm","adp","udproj","slotname","nflteam"]],
+        ud_df[["player","player_norm","etr_match_norm","adp","udproj","slotname","nflteam"]],
         etr_df[["player_norm","position","nflteam","etrproj"]],
         left_on="etr_match_norm",
         right_on="player_norm",
         how="left"
-    )    
+    )
+ 
     # Standardize column names
     pool_df.rename(columns={
         "slotname":"position_ud",
