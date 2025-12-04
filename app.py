@@ -152,5 +152,10 @@ if ud_file and etr_file:
 
         st.subheader("Draft Results")
         st.dataframe(result_df)
-
-        st.download_button("Download Draft CSV", result_df.to_csv(index=False).encode("utf-8"), file_name=f"drafts_{int(time.time())}.csv)
+        
+        st.download_button(
+            "Download Draft CSV",
+            result_df.to_csv(index=False).encode("utf-8"),
+            file_name=f"drafts_{int(time.time())}.csv",
+            mime="text/csv"
+        )
