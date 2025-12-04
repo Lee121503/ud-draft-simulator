@@ -169,6 +169,17 @@ if ud_file and etr_file:
                     ]
                 st.session_state.current_index += 1
 
+    # --- Reset Draft ---
+    if st.sidebar.button("Reset Draft"):
+        st.session_state.picks = []
+        st.session_state.available = pool_df.copy()
+        st.session_state.teams = [init_team_roster() for _ in range(num_teams)]
+        st.session_state.order = snake_order(num_teams, rounds)
+        st.session_state.current_index = 0
+        st.session_state.awaiting_pick = False
+        st.success("Draft has been reset. Start again!")
+
+
     # --- Manual Pick UI ---
     if st.session_state.awaiting_pick:
         r, t = st.session_state.order[st.session_state.current_index]
