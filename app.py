@@ -366,6 +366,23 @@ if not result_df.empty:
             use_container_width=True
         )
 
+    # --- Recommended Pick (Computer Suggestion) ---
+    if not st.session_state.available.empty:
+        recommended = pick_player(
+            st.session_state.available,
+            st.session_state.teams[st.session_state.my_team],
+            w_proj,
+            w_adp
+        )
+        if recommended is not None:
+            st.subheader("Recommended Pick (Computer Suggestion)")
+            st.write(
+                f"**{recommended['player']}** "
+                f"({recommended['position']}, {recommended['nflteam']}) "
+                f"- ADP: {recommended['adp']}, "
+                f"ETRProj: {recommended['etrproj']:.2f}, "
+                f"VORP: {recommended['vorp']:.2f}"
+            )
 
     # Download button
     st.download_button(
