@@ -348,7 +348,7 @@ if ud_file and etr_file:
             # Sort by projection and VORP
             best_remaining = avail.sort_values(
                 ["etrproj","vorp"], ascending=False
-            ).head(15)
+            ).head(48)
     
             st.dataframe(
                 best_remaining[["player","position","nflteam","adp","etrproj","udproj","vorp"]],
