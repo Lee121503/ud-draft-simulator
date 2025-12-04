@@ -98,9 +98,9 @@ etr_df = pd.read_csv(ETR_URL)
 ud_df.columns = ud_df.columns.str.strip().str.lower()
 etr_df.columns = etr_df.columns.str.strip().str.lower()
 
-    # Clean UD
-    ud_df["player"] = ud_df["firstname"] + " " + ud_df["lastname"]
-    ud_df.rename(columns={"adp":"adp","projectedpoints":"udproj","teamname":"nflteam"}, inplace=True)
+# Clean UD
+ud_df["player"] = ud_df["firstname"] + " " + ud_df["lastname"]
+ud_df.rename(columns={"adp":"adp","projectedpoints":"udproj","teamname":"nflteam"}, inplace=True)
 
     # Clean ETR — use Half PPR Proj
     etr_df.rename(columns={"pos":"position","team":"nflteam","half ppr proj":"etrproj"}, inplace=True)
