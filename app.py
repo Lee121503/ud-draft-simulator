@@ -328,12 +328,21 @@ if ud_file and etr_file:
         # --- Best players remaining ---
         if not st.session_state.available.empty:
             st.subheader("Best Players Remaining")
-            best_remaining = st.session_state.available.sort_values(
+    
+            # Filter out players marked OUT in UD lineupstatus
+            avail = st.session_state.available.copy()
+            if "lineupstatus" in avail.columns:
+                avail = avail[~avail["lineupstatus"].str.upper().eq("OUT")]
+    
+            # Sort by projection and VORP
+            best_remaining = avail.sort_values(
                 ["etrproj","vorp"], ascending=False
-            ).head(15)  # show top 15
-            st.dataframe(best_remaining[["player","position","nflteam","adp","etrproj","udproj","vorp"]],
-                         use_container_width=True)
-
+            ).head(15)
+    
+            st.dataframe(
+                best_remaining[["player","position","nflteam","adp","etrproj","udproj","vorp"]],
+                use_container_width=True
+            )
 
         # Download button
         st.download_button(
